@@ -4,7 +4,7 @@
 
 ### Installation
 #### pip
-pip install mcp anthropic ollama
+pip install mcp anthropic ollama flask
 
 #### local model:
 1. **Install Ollama:**
