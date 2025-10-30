@@ -6,7 +6,6 @@ import ollama
 client = chromadb.Client()
 
 # Set up Ollama embedding function
-# Make sure Ollama is running locally with: ollama serve
 ollama_ef = embedding_functions.OllamaEmbeddingFunction(
     url="http://localhost:11434/api/embeddings",
     model_name="nomic-embed-text" #"llama3"  
@@ -45,17 +44,11 @@ for i, (doc, distance) in enumerate(zip(results['documents'][0], results['distan
     print(f"{i+1}. {doc}")
     print(f"   Distance: {distance}\n")
 
-# Optional: Use Ollama for LLM generation after retrieval
-import requests
-
-def query_ollama(prompt, model="llama3"):
-    response = ollama.generate(model=model, prompt=prompt)
-    return response['response']
 
 
 # RAG example: Retrieve context and generate response
 context = "\n".join(results['documents'][0])
 prompt = f"Based on this context:\n{context}\n\nAnswer: {query_text}"
 print(f"Prompt: {prompt}")
-answer = query_ollama(prompt)
-print(f"LLM Response:\n{answer}")
+response = ollama.generate(model="llama3", prompt=prompt)['response']
+print(f"LLM Response:\n{response}")

@@ -66,7 +66,7 @@ class SimpleRuleBasedAgent:
         
         return "I don't understand that query. I can: calculate math, get time, or count string length."
 
-# Initialize the agent
+
 agent = SimpleRuleBasedAgent(langchain_tools)
 
 # Create MCP server
@@ -78,7 +78,7 @@ async def list_tools() -> list[Tool]:
     return [
         Tool(
             name="run_agent",
-            description="Run the rule-based agent with a query. Can calculate math, get time, or count string length.",
+            description="Run the rule-based agent with a query. Can calculate math or get time.",
             inputSchema={
                 "type": "object",
                 "properties": {
