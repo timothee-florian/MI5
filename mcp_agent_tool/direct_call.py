@@ -62,7 +62,7 @@ async def demo_all_tools():
     # Define server parameters
     server_params = StdioServerParameters(
         command="python",
-        args=["mcp_rule_based_agent_without_llm.py"],
+        args=["mcp_rule_based_agent_without_llm_but_chroma.py"],#["mcp_rule_based_agent_without_llm.py"],
         env=None
     )
     
@@ -108,6 +108,15 @@ async def demo_all_tools():
             result = await session.call_tool(
                 "run_agent",
                 arguments={"query": "100 / 5"}
+            )
+
+            # 4. testing RAG
+            print("4. testing the chroma RAG")
+            query = "Tell me info about vector database."
+            print(query)
+            result = await session.call_tool(
+                "run_agent",
+                arguments={"query": query}
             )
             for content in result.content:
                 if hasattr(content, 'text'):
