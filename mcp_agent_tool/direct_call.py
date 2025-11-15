@@ -17,7 +17,7 @@ async def call_mcp_tool(tool_name: str, arguments: dict = None):
     # Define server parameters
     server_params = StdioServerParameters(
         command="python",
-        args=["mcp_rule_based_agent_without_llm.py"],
+        args=["mcp_rule_based_agent_without_llm_but_chroma.py"],
         env=None
     )
     
@@ -140,6 +140,9 @@ def main():
     elif sys.argv[1] == "get_time":
         # Call get_time tool
         asyncio.run(call_mcp_tool("get_time"))
+    else:
+        expression = sys.argv[1]
+        asyncio.run(call_mcp_tool("run_agent", {"query": expression}))
 
 
 if __name__ == "__main__":

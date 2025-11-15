@@ -16,11 +16,11 @@ import re
 from datetime import datetime
 import chromadb
 from chromadb.utils import embedding_functions
-
-chroma_client = chromadb.PersistentClient(path="/home/tim/Desktop/MI5/mcp_agent_tool/chroma_db")
+from chroma_populating import CHROMA_PATH, CHROMA_MODEL
+chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
 
 ollama_ef = embedding_functions.OllamaEmbeddingFunction(
-    model_name="nomic-embed-text" #"llama3"  
+    model_name= CHROMA_MODEL
 )
 
 collection = chroma_client.get_or_create_collection(
@@ -39,17 +39,17 @@ def retrieve_info(query: str) -> str:
 
     results = collection.query(
         query_texts=[query],
-        n_results=2
+        n_results=3
     )
 
     print(f"Query: {query}\n")
     print("Results:")
-    out = "out: "
+    out = [f"out for {query}:\n"]
     for i, (doc, distance) in enumerate(zip(results['documents'][0], results['distances'][0])):
         print(f"{i+1}. {doc}")
         print(f"   Distance: {distance}\n")
-        out += f"{doc}"
-    return "\n".join(results['documents'][0])
+        out += [f"{doc}: {distance}"]
+    return "\n".join(out)#"\n".join(results['documents'][0])
 
 # Define the agent tools
 def calculator(query: str) -> str:
@@ -82,7 +82,7 @@ langchain_tools = [
     LangChainTool(
         name="RetrieveInfo",
         func=retrieve_info,
-        description="Returns the length of a string. Input should be the string."
+        description="Returns information saved as documents into a Vector store."
         )
 ]
 
@@ -93,20 +93,20 @@ class SimpleRuleBasedAgent:
     
     def run(self, query: str) -> str:
         query_lower = query.lower()
-        
+        print(f'query_lower: {query_lower}')
         if any(word in query_lower for word in ['calculate', 'math', '+', '-', '*', '/']):
             for tool_name, tool in self.tools.items():
-                if 'calculator' in tool_name.lower():
+                if tool_name == "Calculator" :
                     return tool.func(query)
         
         elif any(word in query_lower for word in ['time', 'date', 'clock']):
             for tool_name, tool in self.tools.items():
-                if 'time' in tool_name.lower():
+                if tool_name == "GetTime":
                     return tool.func(query)
                 
         elif any(word in query_lower for word in ['tell', 'info']):
             for tool_name, tool in self.tools.items():
-                if 'info' in tool_name.lower():
+                if tool_name == "RetrieveInfo":
                     return tool.func(query)
         
         
@@ -130,7 +130,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The query to process (e.g., 'calculate 5+3', 'what time is it')"
+                        "description": "The query to process (e.g., 'calculate 5+3', 'what time is it', 'Get me information about Napoleon' (RAG))"
                     }
                 },
                 "required": ["query"]
