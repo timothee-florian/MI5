@@ -1,0 +1,4 @@
+*__pycache__*
+*.bin
+*.sqlite3
+HF/*
