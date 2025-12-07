@@ -1,0 +1,5 @@
+embeded_model = "BAAI/bge-base-en-v1.5"
+llm_model = "Qwen/Qwen2.5-0.5B-Instruct"
+main_dir = "/home/tim/Desktop"
+
+CHROMA_PATH = "/home/tim/Desktop/MI5/HF/chroma_db_HF"
