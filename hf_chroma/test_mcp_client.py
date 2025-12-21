@@ -179,19 +179,6 @@ async def demo_all_tools():
                     print(f"Result: {content.text}")
             print()
             
-            # # Test 8: Complex multi-step query
-            # print("TEST 8: Complex multi-step query with LangChain")
-            # print("-" * 40)
-            # query = "Calculate 100 * 25 and tell me what time it is"
-            # print(f"Query: {query}")
-            # result = await session.call_tool(
-            #     "run_agent",
-            #     arguments={"query": query, "use_langchain": True}
-            # )
-            # for content in result.content:
-            #     if hasattr(content, 'text'):
-            #         print(f"Result: {content.text}")
-            # print()
             
             print("="*60)
             print("ALL TESTS COMPLETED")

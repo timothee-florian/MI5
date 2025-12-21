@@ -7,7 +7,7 @@ from transformers import AutoModel, AutoTokenizer
 import torch
 import chromadb
 from download import local_dir
-from constants import embeded_model, main_dir, CHROMA_PATH
+from constants import embeded_model, main_dir, CHROMA_PATH, COLLECTION_NAME
 import os
 COLLECTION_NAME = "my_collection"
 

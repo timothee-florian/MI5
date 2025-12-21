@@ -12,10 +12,10 @@ from datetime import datetime
 import chromadb
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModel
 import torch
-from chroma_populating import COLLECTION_NAME, QwenEmbeddingFunction
+from chroma_populating import QwenEmbeddingFunction
 from download import model_name, local_dir
 import os
-from constants import embeded_model, main_dir, llm_model, CHROMA_PATH
+from constants import embeded_model, main_dir, llm_model, CHROMA_PATH, COLLECTION_NAME
 
 # Global variables for Qwen LLM model
 qwen_llm_model = None
@@ -57,7 +57,7 @@ print(f"ChromaDB collection loaded. Total documents: {collection.count()}")
 
 # Define tools using @tool decorator for LangChain 1.1.2
 @tool
-def retrieve_info(query: str) -> str:
+def retrieve_info(query: str, n_results: int = 3) -> str:
     """Retrieve information from the vector database that is most related to the query. 
     Use this tool when the user asks for information, facts, or knowledge about a topic.
     Input should be a clear query or question."""
@@ -65,7 +65,7 @@ def retrieve_info(query: str) -> str:
     try:
         results = collection.query(
             query_texts=[query],
-            n_results=3
+            n_results=n_results
         )
 
         print(f"\n[RETRIEVE_INFO] Query: {query}")
@@ -174,9 +174,6 @@ class QwenChatModel(BaseChatModel):
         
         return response.strip()
     
-    def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs: Any):
-        """Streaming not implemented"""
-        raise NotImplementedError("Streaming not supported")
     
     @property
     def _identifying_params(self) -> dict:
