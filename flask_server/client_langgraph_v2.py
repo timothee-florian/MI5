@@ -23,43 +23,76 @@ import json
 
 # Global MCP session (will be initialized in async context)
 mcp_session = None
+mcp_tools_list = None
 
-# Define LangChain tools that wrap MCP tools
-@tool
-async def calculate(expression: str) -> str:
-    """Perform basic arithmetic calculations
+def create_langchain_tool_from_mcp(mcp_tool):
+    """Create a LangChain tool from an MCP tool definition"""
     
-    Args:
-        expression: Mathematical expression to evaluate (e.g., "2 + 2", "10 * 5")
-    """
-    try:
-        result = await mcp_session.call_tool("calculate", arguments={"expression": expression})
-        return result.content[0].text
-    except Exception as e:
-        return f"Error: {str(e)}"
+    @tool
+    async def mcp_tool_wrapper(**kwargs) -> str:
+        """Dynamically created tool from MCP server"""
+        try:
+            result = await mcp_session.call_tool(mcp_tool.name, arguments=kwargs)
+            return result.content[0].text
+        except Exception as e:
+            return f"Error: {str(e)}"
+    
+    # Set the tool metadata
+    mcp_tool_wrapper.name = mcp_tool.name
+    mcp_tool_wrapper.description = mcp_tool.description
+    mcp_tool_wrapper.args_schema = mcp_tool.inputSchema
+    
+    return mcp_tool_wrapper
 
-@tool
-async def get_time() -> str:
-    """Get the current time"""
-    try:
-        result = await mcp_session.call_tool("get_time", arguments={})
-        return result.content[0].text
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-def create_agent_graph(model_name: str = "llama3.2"):
+def create_agent_graph(model_name: str = "llama3.2", langchain_tools: list = None):
     """Create a LangGraph agent with MCP tools"""
     
-    # Initialize the LLM
-    llm = ChatOllama(model=model_name, temperature=0)
+    if langchain_tools is None:
+        langchain_tools = []
+    
+    # Initialize the LLM with better parameters for tool use
+    llm = ChatOllama(
+        model=model_name, 
+        temperature=0,
+        num_ctx=4096  # Larger context for better reasoning
+    )
     
     # Bind tools to the LLM
-    tools = [calculate, get_time]
-    llm_with_tools = llm.bind_tools(tools)
+    llm_with_tools = llm.bind_tools(langchain_tools)
     
-    # Define the agent function
+    # Build tool descriptions for system prompt
+    tool_descriptions = "\n".join([
+        f"- '{t.name}': {t.description}" for t in langchain_tools
+    ])
+    
+    # Define the agent function with system message
     async def call_model(state: MessagesState):
         messages = state["messages"]
+        
+        # Add system message to guide tool usage if first call
+        if len(messages) == 1:
+            system_prompt = {
+                "role": "system",
+                "content": f"""You are a helpful assistant with access to tools. 
+
+Available tools:
+{tool_descriptions}
+
+IMPORTANT RULES:
+- Only use tools when they are NECESSARY to answer the question
+- Do NOT use tools for general knowledge questions that you already know
+- Use 'calculate' tool ONLY for mathematical computations that need evaluation
+- Use 'get_time' tool ONLY when asked about current time/date
+- For questions about facts, geography, history, or general knowledge, answer directly without tools
+
+Examples:
+- "What is the capital of France?" -> Answer directly: "Paris" (NO TOOLS)
+- "What is 2+2?" -> Answer directly: "4" (NO TOOLS for simple math)
+- "Calculate 12345 * 67890" -> Use calculate tool (complex calculation)
+- "What time is it?" -> Use get_time tool (real-time data needed)"""
+            }
+            messages = [system_prompt] + messages
+        
         response = await llm_with_tools.ainvoke(messages)
         return {"messages": [response]}
     
@@ -79,7 +112,7 @@ def create_agent_graph(model_name: str = "llama3.2"):
                 
                 # Find and execute the tool
                 tool_to_execute = None
-                for t in tools:
+                for t in langchain_tools:
                     if t.name == tool_name:
                         tool_to_execute = t
                         break
@@ -136,12 +169,12 @@ def create_agent_graph(model_name: str = "llama3.2"):
 async def run_langgraph_agent(user_query: str, model: str = "llama3.2"):
     """Run a LangGraph agent using MCP tools"""
     
-    global mcp_session
+    global mcp_session, mcp_tools_list
     
     # Define server parameters
     server_params = StdioServerParameters(
         command="python",
-        args=["mcp_server.py"],
+        args=["server_rest.py"],
         env=None
     )
     
@@ -153,12 +186,20 @@ async def run_langgraph_agent(user_query: str, model: str = "llama3.2"):
             mcp_session = session
             
             # Get available tools from MCP server
-            tools_list = await session.list_tools()
-            print(f"Connected to MCP server with {len(tools_list.tools)} tools available\n")
-            print(f"Using model: {model}\n")
+            mcp_tools_list = await session.list_tools()
+            print(f"Connected to MCP server with {len(mcp_tools_list.tools)} tools available:")
             
-            # Create the agent graph
-            app = create_agent_graph(model)
+            # Create LangChain tools from MCP tools
+            langchain_tools = []
+            for mcp_tool in mcp_tools_list.tools:
+                print(f"  - {mcp_tool.name}: {mcp_tool.description}")
+                lc_tool = create_langchain_tool_from_mcp(mcp_tool)
+                langchain_tools.append(lc_tool)
+            
+            print(f"\nUsing model: {model}\n")
+            
+            # Create the agent graph with dynamically loaded tools
+            app = create_agent_graph(model, langchain_tools)
             
             # Prepare input
             print(f"User: {user_query}\n")
@@ -186,14 +227,25 @@ async def run_langgraph_agent(user_query: str, model: str = "llama3.2"):
                 # Print final AI response
                 if isinstance(last_message, AIMessage) and last_message.content:
                     if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
-                        print(f"🤖 Agent: {last_message.content}")
+                        print(f"🤖 Agent: {last_message.content}🤖 ")
 
 def main():
     """Main entry point"""
-
-    from langchain_ollama import ChatOllama
-    llm = ChatOllama(model="llama3.2")
-
+    # Check Ollama availability
+    try:
+        from langchain_ollama import ChatOllama
+        llm = ChatOllama(model="llama3.2")
+        # Quick test
+        llm.invoke("test")
+        print("✓ Ollama is running\n")
+    except Exception as e:
+        print(f"✗ Error connecting to Ollama: {e}\n")
+        print("Make sure Ollama is installed and running:")
+        print("1. Install from https://ollama.ai")
+        print("2. Pull a model: ollama pull llama3.2")
+        print("3. Verify: ollama list\n")
+        return
+    
     # Choose model
     model = "llama3.2"  # Change to llama3.1, mistral, phi3, etc.
     

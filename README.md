@@ -11,7 +11,7 @@ This repository is used to prototype various agent designs, explore their behavi
 
 ### Installation
 #### pip
-pip install mcp anthropic ollama
+pip install mcp anthropic ollama flask
 
 #### local model:
 1. **Install Ollama:**
