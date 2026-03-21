@@ -1,3 +1,10 @@
+# MI5 
+
+A personal project to build, experiment with, and test different AI coding agents.
+
+This repository is used to prototype various agent designs, explore their behavior, and evaluate how they perform on coding-related tasks such as generation, debugging, and automation.
+
+
 ### Prerequisites
 
 - Python 3.8 or higher
