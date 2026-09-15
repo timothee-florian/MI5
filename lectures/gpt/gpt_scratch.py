@@ -7,7 +7,7 @@ batch_size = 32 # how many independent sequences will we process in parallel?
 block_size = 8 # what is the maximum context length for predictions?
 eval_iters = 200
 max_iters = 10000
-lr = 1e-2
+lr = 1e-3
 device = 'cpu'#'cuda' if torch.cuda.is_available() else 'cpu'
 eval_interval = 100
 n_embd = 32
@@ -61,12 +61,34 @@ def estimate_loss():
     model.train()
     return out
 
+class Head(nn.Module):
+    """ one head of self-attention """
 
+    def __init__(self, head_size):
+        super().__init__()
+        self.key = nn.Linear(n_embd, head_size, bias=False)
+        self.query = nn.Linear(n_embd, head_size, bias=False)
+        self.value = nn.Linear(n_embd, head_size, bias=False)
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size))) # create lower triangular matrix
+       
+
+    def forward(self, x):
+        B, T, C = x.shape
+        k = self.key(x) # (B, T, head_size)
+        q = self.query(x) # (B, T, head_size)
+        wei = q @ k.transpose(-2, -1) * C**-0.5 # (B, T, T)
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
+        wei = F.softmax(wei, dim=-1) # (B, T, T)
+        v = self.value(x) # (B, T, head_size)
+        out = wei @ v # (B, T, head_size)
+        return out
+    
 class BigramLanguageModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
+        self.sa_head = Head(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
     def forward(self, idx, targets=None):
@@ -75,6 +97,7 @@ class BigramLanguageModel(nn.Module):
         tok_emb = self.token_embedding_table(idx) #(B, T, C)
         pos_emb = self.position_embedding_table(torch.arange(T, device=device)) #(T, C)
         x = tok_emb + pos_emb #(B, T, C)
+        x = self.sa_head(x) #(B, T, C) apply self-attention
         logits = self.lm_head(x) #(B, T, vocab_size)
         if targets is  None:
             loss = None
@@ -88,7 +111,8 @@ class BigramLanguageModel(nn.Module):
 
     def generate(self, idx, max_new_tokens):
         for _ in range(max_new_tokens):
-            logits, _ = self.forward(idx)
+            idx_cond = idx[:, -block_size:] # crop context to block size
+            logits, _ = self.forward(idx_cond)
             logits = logits[:, -1, :] # become (B, C)
             probs = F.softmax(logits, dim=-1) # (B, C)
             idx_next = torch.multinomial(probs, num_samples=1) # (B, 1)
@@ -117,25 +141,3 @@ for iter in range(max_iters):
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
 print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
 
-class Head(nn.Module):
-    """ one head of self-attention """
-
-    def __init__(self, head_size):
-        super().__init__()
-        self.key = nn.Linear(n_embd, head_size, bias=False)
-        self.query = nn.Linear(n_embd, head_size, bias=False)
-        self.value = nn.Linear(n_embd, head_size, bias=False)
-        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size))) # create lower triangular matrix
-       
-
-    def forward(self, x):
-        B, T, C = x.shape
-        k = self.key(x) # (B, T, head_size)
-        q = self.query(x) # (B, T, head_size)
-        wei = q @ k.transpose(-2, -1) * C**-0.5 # (B, T, T)
-        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
-        wei = F.softmax(wei, dim=-1) # (B, T, T)
-        v = self.value(x) # (B, T, head_size)
-        out = wei @ v # (B, T, head_size)
-        return out
-    
