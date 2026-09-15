@@ -116,3 +116,23 @@ for iter in range(max_iters):
 # generate from the model
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
 print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
+
+def attention(head_size):
+    torch.manual_seed(1337)
+    B, T, C = 4, 8, 32 # batch size, time steps (sequence length), channels (in vocab)
+    x = torch.randn(B, T, C)
+
+    query = nn.Linear(C, head_size, bias=False)
+    key = nn.Linear(C, head_size, bias=False)
+    value = nn.Linear(C, head_size, bias=False)
+
+    q = query(x) # (B, T, head_size)
+    k = key(x) # (B, T, head_size)
+    v = value(x) # (B, T, head_size)
+
+    wei = q @ k.transpose(-2, -1) * head_size**-0.5 # (B, T, T)
+    tiling = torch.tril(torch.ones(T, T)) # (T, T)
+    wei = wei.masked_fill(tiling == 0, float('-inf')) #
+    wei = F.softmax(wei, dim=-1) # (B, T, T)
+    out = wei @ v # (B, T, head_size)
+    return out
