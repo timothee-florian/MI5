@@ -141,8 +141,8 @@ class BatchNorm1d:
   def __call__(self, x):
     # calculate the forward pass
     if self.training:
-      xmean = x.mean(0, keepdim=True) # batch mean
-      xvar = x.var(0, keepdim=True) # batch variance
+      xmean = x.mean(1, keepdim=True) # batch mean
+      xvar = x.var(1, keepdim=True) # batch variance
     else:
       xmean = self.running_mean
       xvar = self.running_var
