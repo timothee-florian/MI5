@@ -94,7 +94,7 @@ class MultiHeadAttention(nn.Module):
 
     def forward(self, x):
         out = torch.cat([h(x) for h in self.heads], dim=-1)
-        out = self.proj(out)
+        out = self.proj(out) #to check why needed
         return out
 
 class FeedForward(nn.Module):
@@ -103,9 +103,9 @@ class FeedForward(nn.Module):
     def __init__(self, n_embd):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_embd, n_embd),
+            nn.Linear(n_embd, 4* n_embd),
             nn.ReLU(),
-            nn.Linear(n_embd, n_embd)
+            nn.Linear(4* n_embd, n_embd)#to check why needed
         )
 
     def forward(self, x):
